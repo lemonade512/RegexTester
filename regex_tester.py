@@ -39,19 +39,23 @@ class RegexApp(gtk.Window):
 
         flags_eb = gtk.EventBox()
         flags_vbox = gtk.VBox()
-        flags_vbox.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse("red"))
 
         ignore_case_flag = gtk.CheckButton("Ignore Case")
         ignore_case_flag.connect("toggled", self.flag_activated, re.IGNORECASE)
-        flags_vbox.pack_start(ignore_case_flag, False, False)
+        flags_vbox.pack_start(ignore_case_flag, False, False, padding=5)
 
         multiline_flag = gtk.CheckButton("Multiline")
         multiline_flag.connect("toggled", self.flag_activated, re.MULTILINE)
-        flags_vbox.pack_start(multiline_flag, False, False)
+        flags_vbox.pack_start(multiline_flag, False, False, padding=5)
+
+        dotall_flag = gtk.CheckButton("Dotall")
+        dotall_flag.connect("toggled", self.flag_activated, re.DOTALL)
+        flags_vbox.pack_start(dotall_flag, False, False, padding=5)
+
         flags_eb.add(flags_vbox)
         #flags_eb.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse("red"))
 
-        main_hbox.pack_start(flags_eb, False, False)
+        main_hbox.pack_start(flags_eb, False, False, padding=10)
 
         main_vbox.pack_start(main_hbox)
         self.add(main_vbox)
@@ -88,25 +92,58 @@ class RegexApp(gtk.Window):
 
     def match_regex(self, *args):
         """ Updates the textview to show the text matched by the regex. """
-        if self.regex:
-            buf = self.textview.get_buffer()
-            buf.remove_all_tags(buf.get_start_iter(), buf.get_end_iter())
-            text = buf.get_text(buf.get_start_iter(), buf.get_end_iter())
-            for i,line in enumerate(text.split('\n')):
-                m = re.search(self.regex, line, flags=self.flags)
-                if m:
-                    start = buf.get_iter_at_line_offset(i, m.span()[0])
-                    end = buf.get_iter_at_line_offset(i, m.span()[1])
-                    buf.apply_tag(self.red_tag, start, end)
-                    for group_num, g in enumerate(m.groups()):
-                        if m.start(group_num+1) == -1:
-                            #TODO is this case handled properly? (seems to work but not
-                            #sure if I should do anything else here).
-                            continue
-                        start = buf.get_iter_at_line_offset(i, m.start(group_num+1))
-                        end = buf.get_iter_at_line_offset(i, m.end(group_num+1))
-                        print g, m.start(group_num+1), m.end(group_num+1)
-                        buf.apply_tag(self.green_tag, start, end)
+        if not self.regex:
+            self.regex = ""
+        buf = self.textview.get_buffer()
+        buf.remove_all_tags(buf.get_start_iter(), buf.get_end_iter())
+        if not (self.flags & re.MULTILINE):
+            self._match_lines(buf)
+        else:
+            self._match_text(buf)
+
+    #TODO _match_lines and _match_text are very similar. Is there a way to combine
+    # the two for less code?
+    def _match_lines(self, buf):
+        text = buf.get_text(buf.get_start_iter(), buf.get_end_iter())
+        for i,line in enumerate(text.split('\n')):
+            m = re.search(self.regex, line, flags=self.flags)
+
+            # If there is no match on this line continue to the next
+            if not m:
+                continue
+
+            start = buf.get_iter_at_line_offset(i, m.span()[0])
+            end = buf.get_iter_at_line_offset(i, m.span()[1])
+            buf.apply_tag(self.red_tag, start, end)
+            for group_num, g in enumerate(m.groups()):
+                if m.start(group_num+1) == -1:
+                    # This happens when an optional group does not
+                    # contribute to the match. In this case there is
+                    # no group to highlight.
+                    continue
+                start = buf.get_iter_at_line_offset(i, m.start(group_num+1))
+                end = buf.get_iter_at_line_offset(i, m.end(group_num+1))
+                buf.apply_tag(self.green_tag, start, end)
+
+    def _match_text(self, buf):
+        text = buf.get_text(buf.get_start_iter(), buf.get_end_iter())
+        m = re.search(self.regex, text, flags=self.flags)
+
+        if not m:
+            return
+
+        start = buf.get_iter_at_offset(m.span()[0])
+        end = buf.get_iter_at_offset(m.span()[1])
+        buf.apply_tag(self.red_tag, start, end)
+        for group_num, g in enumerate(m.groups()):
+            if m.start(group_num+1) == -1:
+                # This happens when an optional group does not
+                # contribute to the match. In this case there is
+                # no group to highlight.
+                continue
+            start = buf.get_iter_at_offset(m.start(group_num+1))
+            end = buf.get_iter_at_offset(m.end(group_num+1))
+            buf.apply_tag(self.green_tag, start, end)
 
 
 if __name__ == "__main__":
