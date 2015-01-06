@@ -3,6 +3,7 @@
 import gtk
 import pango
 import re
+import os
 
 
 class RegexApp(gtk.Window):
@@ -10,6 +11,14 @@ class RegexApp(gtk.Window):
     def __init__(self, *args, **kwargs):
         """ Initializes the GUI elements and sets the regex to None. """
         super(RegexApp, self).__init__(*args, **kwargs)
+
+        # Save files
+        home = os.path.expanduser("~")
+        self.buf_save_filename = os.path.join(home, ".regex_tester/buffer_save.txt")
+        if not os.path.isdir(os.path.dirname(self.buf_save_filename)):
+            os.makedirs(os.path.dirname(self.buf_save_filename))
+
+        open(self.buf_save_filename, 'a').close()
 
         self.set_size_request(500, 500)
         self.set_position(gtk.WIN_POS_CENTER)
@@ -26,8 +35,10 @@ class RegexApp(gtk.Window):
         scroll = gtk.ScrolledWindow()
         self.textview = gtk.TextView()
         buf = self.textview.get_buffer()
-        buf.set_text("ACG ACT\nACT\nAGA\nCGA\nCTA\nCGT")
-        buf.connect("changed", self.match_regex)
+        f = open(self.buf_save_filename, 'r')
+        buf.set_text(f.read())
+        f.close()
+        buf.connect("changed", self.buffer_changed)
         self.red_tag = buf.create_tag("fg_red", foreground='red',
                                             underline=pango.UNDERLINE_SINGLE)
         self.blue_tag = buf.create_tag("fg_blue", foreground='blue',
@@ -82,15 +93,7 @@ class RegexApp(gtk.Window):
         self._set_regex(entry.get_text())
         self.match_regex()
 
-    def _set_regex(self, regex):
-        """ If regex is properly formatted self.regex is set. """
-        try:
-            re.compile(regex)
-            self.regex = regex
-        except re.error, e:
-            print e
-
-    def match_regex(self, *args):
+    def match_regex(self):
         """ Updates the textview to show the text matched by the regex. """
         if not self.regex:
             self.regex = ""
@@ -100,6 +103,21 @@ class RegexApp(gtk.Window):
             self._match_lines(buf)
         else:
             self._match_text(buf)
+
+    def buffer_changed(self, buf):
+        f = open(self.buf_save_filename, 'w')
+        f.write(buf.get_text(buf.get_start_iter(), buf.get_end_iter()))
+        f.close()
+
+        self.match_regex()
+
+    def _set_regex(self, regex):
+        """ If regex is properly formatted self.regex is set. """
+        try:
+            re.compile(regex)
+            self.regex = regex
+        except re.error, e:
+            print e
 
     #TODO _match_lines and _match_text are very similar. Is there a way to combine
     # the two for less code?
