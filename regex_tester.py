@@ -77,7 +77,7 @@ class RegexApp(gtk.Window):
         self.flags = 0
 
     def flag_activated(self, btn, flag):
-        print "Activated", btn.get_label(), btn.get_active()
+        """ Called when the user toggles a flag. """
         if btn.get_active():
             self.flags |= flag
         else:
